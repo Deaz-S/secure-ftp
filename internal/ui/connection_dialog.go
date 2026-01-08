@@ -2,11 +2,13 @@
 package ui
 
 import (
+	"fmt"
 	"strconv"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
 	"secure-ftp/internal/config"
@@ -24,6 +26,7 @@ type ConnectionDialog struct {
 
 	// Form fields
 	profileSelect     *widget.Select
+	deleteProfileBtn  *widget.Button
 	protocolSelect    *widget.Select
 	hostEntry         *widget.Entry
 	portEntry         *widget.Entry
@@ -123,6 +126,11 @@ func (cd *ConnectionDialog) buildForm() {
 	}
 	cd.profileSelect = widget.NewSelect(profileNames, cd.onProfileSelected)
 
+	// Delete profile button (hidden by default)
+	cd.deleteProfileBtn = widget.NewButtonWithIcon("", theme.DeleteIcon(), cd.deleteSelectedProfile)
+	cd.deleteProfileBtn.Importance = widget.DangerImportance
+	cd.deleteProfileBtn.Hide()
+
 	// Initial selections
 	cd.protocolSelect.SetSelectedIndex(0)
 	cd.profileSelect.SetSelectedIndex(0)
@@ -130,10 +138,13 @@ func (cd *ConnectionDialog) buildForm() {
 	// Private key row
 	privateKeyRow := container.NewBorder(nil, nil, nil, cd.privateKeyBtn, cd.privateKeyEntry)
 
+	// Profile row with delete button
+	profileRow := container.NewBorder(nil, nil, nil, cd.deleteProfileBtn, cd.profileSelect)
+
 	// Form layout
 	form := container.NewVBox(
 		widget.NewLabel("Profil :"),
-		cd.profileSelect,
+		profileRow,
 		widget.NewSeparator(),
 		widget.NewLabel("Protocole :"),
 		cd.protocolSelect,
@@ -179,6 +190,7 @@ func (cd *ConnectionDialog) onProfileSelected(selected string) {
 	if selected == "-- Nouvelle connexion --" {
 		cd.clearForm()
 		cd.selectedProfileID = ""
+		cd.deleteProfileBtn.Hide()
 		return
 	}
 
@@ -187,6 +199,7 @@ func (cd *ConnectionDialog) onProfileSelected(selected string) {
 	for _, p := range profiles {
 		if p.Name == selected {
 			cd.loadProfile(&p)
+			cd.deleteProfileBtn.Show()
 			return
 		}
 	}
@@ -360,4 +373,49 @@ type connectionError struct {
 
 func (e *connectionError) Error() string {
 	return e.message
+}
+
+func (cd *ConnectionDialog) deleteSelectedProfile() {
+	if cd.selectedProfileID == "" {
+		return
+	}
+
+	profiles := cd.configMgr.GetProfiles()
+	var profileName string
+	for _, p := range profiles {
+		if p.ID == cd.selectedProfileID {
+			profileName = p.Name
+			break
+		}
+	}
+
+	dialog.ShowConfirm("Supprimer le profil",
+		fmt.Sprintf("Supprimer le profil '%s' ?", profileName),
+		func(confirmed bool) {
+			if !confirmed {
+				return
+			}
+
+			if cd.credentialsMgr != nil {
+				cd.credentialsMgr.DeletePassword(cd.selectedProfileID)
+			}
+
+			cd.configMgr.DeleteProfile(cd.selectedProfileID)
+
+			cd.refreshProfileList()
+			cd.clearForm()
+			cd.profileSelect.SetSelectedIndex(0)
+			cd.deleteProfileBtn.Hide()
+		}, cd.window)
+}
+
+func (cd *ConnectionDialog) refreshProfileList() {
+	profiles := cd.configMgr.GetProfiles()
+	profileNames := make([]string, len(profiles)+1)
+	profileNames[0] = "-- Nouvelle connexion --"
+	for i, p := range profiles {
+		profileNames[i+1] = p.Name
+	}
+	cd.profileSelect.Options = profileNames
+	cd.profileSelect.Refresh()
 }
