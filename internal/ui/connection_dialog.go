@@ -387,28 +387,20 @@ func (cd *ConnectionDialog) deleteSelectedProfile() {
 		}
 	}
 
-	confirmDlg := dialog.NewConfirm("Supprimer le profil",
-		fmt.Sprintf("Supprimer le profil '%s' ?", profileName),
-		func(confirmed bool) {
-			if !confirmed {
-				return
-			}
+	// Suppression directe (sans confirmation pour l'instant)
+	if cd.credentialsMgr != nil {
+		cd.credentialsMgr.DeletePassword(cd.selectedProfileID)
+	}
 
-			if cd.credentialsMgr != nil {
-				cd.credentialsMgr.DeletePassword(cd.selectedProfileID)
-			}
+	cd.configMgr.DeleteProfile(cd.selectedProfileID)
+	cd.selectedProfileID = ""
 
-			cd.configMgr.DeleteProfile(cd.selectedProfileID)
-			cd.selectedProfileID = ""
+	cd.refreshProfileList()
+	cd.clearForm()
+	cd.profileSelect.SetSelectedIndex(0)
+	cd.deleteProfileBtn.Disable()
 
-			cd.refreshProfileList()
-			cd.clearForm()
-			cd.profileSelect.SetSelectedIndex(0)
-			cd.deleteProfileBtn.Disable()
-
-			dialog.ShowInformation("Supprimé", fmt.Sprintf("Profil '%s' supprimé", profileName), cd.window)
-		}, cd.window)
-	confirmDlg.Show()
+	dialog.ShowInformation("Supprimé", fmt.Sprintf("Profil '%s' supprimé", profileName), cd.window)
 }
 
 func (cd *ConnectionDialog) refreshProfileList() {
