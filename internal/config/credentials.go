@@ -94,10 +94,8 @@ func (cm *CredentialsManager) load(masterPassword string) error {
 }
 
 // saveWithSalt saves the credentials file with a specific salt.
+// Note: This method does NOT acquire a lock - caller must handle locking if needed.
 func (cm *CredentialsManager) saveWithSalt(salt []byte) error {
-	cm.mu.RLock()
-	defer cm.mu.RUnlock()
-
 	cf := credentialsFile{
 		Salt:        base64.StdEncoding.EncodeToString(salt),
 		Credentials: cm.credentials,
@@ -118,6 +116,7 @@ func (cm *CredentialsManager) saveWithSalt(salt []byte) error {
 }
 
 // save saves the credentials file (reloads salt from existing file).
+// Note: This method does NOT acquire a lock - called from locked contexts (SetPassword, DeletePassword).
 func (cm *CredentialsManager) save() error {
 	// Read existing salt
 	data, err := os.ReadFile(cm.path)
