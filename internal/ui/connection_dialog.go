@@ -2,7 +2,6 @@
 package ui
 
 import (
-	"fmt"
 	"strconv"
 
 	"fyne.io/fyne/v2"
@@ -378,16 +377,6 @@ func (cd *ConnectionDialog) deleteSelectedProfile() {
 		return
 	}
 
-	profiles := cd.configMgr.GetProfiles()
-	var profileName string
-	for _, p := range profiles {
-		if p.ID == cd.selectedProfileID {
-			profileName = p.Name
-			break
-		}
-	}
-
-	// Suppression directe (sans confirmation pour l'instant)
 	if cd.credentialsMgr != nil {
 		cd.credentialsMgr.DeletePassword(cd.selectedProfileID)
 	}
@@ -399,8 +388,6 @@ func (cd *ConnectionDialog) deleteSelectedProfile() {
 	cd.clearForm()
 	cd.profileSelect.SetSelectedIndex(0)
 	cd.deleteProfileBtn.Disable()
-
-	dialog.ShowInformation("Supprimé", fmt.Sprintf("Profil '%s' supprimé", profileName), cd.window)
 }
 
 func (cd *ConnectionDialog) refreshProfileList() {
