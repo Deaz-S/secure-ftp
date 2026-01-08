@@ -361,16 +361,28 @@ func (cd *ConnectionDialog) deleteSelectedProfile() {
 	fmt.Println("DEBUG: Proceeding with deletion")
 
 	if cd.credentialsMgr != nil {
+		fmt.Println("DEBUG: Deleting password...")
 		cd.credentialsMgr.DeletePassword(cd.selectedProfileID)
 	}
 
-	cd.configMgr.DeleteProfile(cd.selectedProfileID)
+	fmt.Println("DEBUG: Calling configMgr.DeleteProfile...")
+	err := cd.configMgr.DeleteProfile(cd.selectedProfileID)
+	if err != nil {
+		fmt.Println("DEBUG: DeleteProfile error:", err)
+	} else {
+		fmt.Println("DEBUG: DeleteProfile success")
+	}
 	cd.selectedProfileID = ""
 
+	fmt.Println("DEBUG: Refreshing profile list...")
 	cd.refreshProfileList()
+	fmt.Println("DEBUG: Clearing form...")
 	cd.clearForm()
+	fmt.Println("DEBUG: Setting select index to 0...")
 	cd.profileSelect.SetSelectedIndex(0)
+	fmt.Println("DEBUG: Disabling delete button...")
 	cd.deleteProfileBtn.Disable()
+	fmt.Println("DEBUG: deleteSelectedProfile complete")
 }
 
 func (cd *ConnectionDialog) refreshProfileList() {
