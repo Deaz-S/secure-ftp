@@ -74,7 +74,9 @@ func NewMainWindow(configMgr *config.ConfigManager) *MainWindow {
 	mw.window.Resize(fyne.NewSize(float32(cfg.WindowWidth), float32(cfg.WindowHeight)))
 
 	// Initialize known hosts manager for SFTP security
-	configDir := filepath.Dir(cfg.LogPath)
+	// Use ~/.config/secure-ftp as config directory (not the logs subdirectory)
+	homeDir, _ := os.UserHomeDir()
+	configDir := filepath.Join(homeDir, ".config", "secure-ftp")
 	knownHosts, err := config.NewKnownHostsManager(configDir)
 	if err != nil {
 		mw.log.Warnf("Failed to initialize known hosts manager: %v", err)
@@ -370,8 +372,16 @@ func (mw *MainWindow) connect(profile *config.ConnectionProfile, password string
 		}
 
 		// Set up host key verification for SFTP
-		if profile.Protocol == "sftp" && mw.knownHosts != nil {
-			connConfig.HostKeyCallback = mw.createHostKeyCallback()
+		if profile.Protocol == "sftp" {
+			if mw.knownHosts != nil {
+				connConfig.HostKeyCallback = mw.createHostKeyCallback()
+			} else {
+				// Fallback: accept all host keys (less secure but allows connection)
+				connConfig.HostKeyCallback = func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+					mw.log.Warnf("Host key verification disabled - accepting key for %s", hostname)
+					return nil
+				}
+			}
 		}
 
 		// Load private key if specified
