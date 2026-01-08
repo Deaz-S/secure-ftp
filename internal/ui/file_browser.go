@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -65,6 +66,10 @@ type FileBrowser struct {
 	// Selection state
 	selectedIndices map[int]bool
 	lastSelectedIdx int
+
+	// Double-click detection
+	lastClickTime  time.Time
+	lastClickedIdx int
 }
 
 // NewFileBrowser creates a new file browser.
@@ -77,6 +82,7 @@ func NewFileBrowser(window fyne.Window, isLocal bool, startPath string) *FileBro
 		selectedIndices: make(map[int]bool),
 		cache:           NewDirCache(DefaultCacheTTL),
 		lastSelectedIdx: -1,
+		lastClickedIdx:  -1,
 	}
 
 	fb.buildUI()
@@ -184,13 +190,21 @@ func (fb *FileBrowser) buildUI() {
 		},
 	)
 
-	// Selection handling
+	// Selection handling with double-click detection
 	fb.fileList.OnSelected = func(id widget.ListItemID) {
 		if id >= len(fb.files) {
 			return
 		}
 
 		item := fb.files[id]
+		now := time.Now()
+
+		// Detect double-click (same item clicked within 400ms)
+		isDoubleClick := fb.lastClickedIdx == id && now.Sub(fb.lastClickTime) < 400*time.Millisecond
+
+		// Update click tracking
+		fb.lastClickedIdx = id
+		fb.lastClickTime = now
 		fb.lastSelectedIdx = id
 		fb.selectedIndices[id] = true
 
@@ -207,13 +221,20 @@ func (fb *FileBrowser) buildUI() {
 			fb.onSelectionChange(fb.GetSelectedFiles())
 		}
 
-		// For directories, navigate on selection
-		if item.IsDir && item.Name != ".." {
-			// Don't auto-navigate, let user double-click or press enter
-		} else if item.IsDir && item.Name == ".." {
+		// Handle double-click on directories
+		if item.IsDir && isDoubleClick {
 			fb.NavigateTo(item.Path)
-		} else {
-			// File selected - trigger callback
+			return
+		}
+
+		// Handle ".." - navigate on single click
+		if item.IsDir && item.Name == ".." {
+			fb.NavigateTo(item.Path)
+			return
+		}
+
+		// Handle double-click on files
+		if !item.IsDir && isDoubleClick {
 			if fb.onFileDoubleClick != nil {
 				fb.onFileDoubleClick(item.Path, false)
 			}
@@ -318,6 +339,7 @@ func (fb *FileBrowser) NavigateTo(path string) {
 	fb.files = items
 	fb.selectedIndices = make(map[int]bool)
 	fb.lastSelectedIdx = -1
+	fb.lastClickedIdx = -1
 	fb.pathEntry.SetText(path)
 	fb.fileList.Refresh()
 
