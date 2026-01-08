@@ -410,7 +410,7 @@ func (s *Syncer) analyzeUpload(localDir, remoteDir string, localMap map[string]o
 				different, err := s.needsSyncByHash(ctx, localPath, remotePath)
 				if err != nil {
 					// On error, assume sync needed
-					s.log.Warn("Hash comparison failed for %s: %v", localPath, err)
+					s.log.Warnf("Hash comparison failed for %s: %v", localPath, err)
 				} else {
 					needSync = different
 				}
@@ -459,7 +459,7 @@ func (s *Syncer) analyzeDownload(localDir, remoteDir string, localMap map[string
 			if needSync && s.options.CompareMethod == CompareByHash {
 				different, err := s.needsSyncByHash(ctx, localPath, remotePath)
 				if err != nil {
-					s.log.Warn("Hash comparison failed for %s: %v", localPath, err)
+					s.log.Warnf("Hash comparison failed for %s: %v", localPath, err)
 				} else {
 					needSync = different
 				}
@@ -529,7 +529,7 @@ func (s *Syncer) analyzeBidirectional(localDir, remoteDir string, localMap map[s
 			if needSync && s.options.CompareMethod == CompareByHash {
 				different, err := s.needsSyncByHash(ctx, localPath, remotePath)
 				if err != nil {
-					s.log.Warn("Hash comparison failed for %s: %v", localPath, err)
+					s.log.Warnf("Hash comparison failed for %s: %v", localPath, err)
 				} else {
 					needSync = different
 				}
