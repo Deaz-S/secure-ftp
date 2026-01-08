@@ -4,8 +4,38 @@ package protocol
 import (
 	"context"
 	"io"
+	"net"
 	"time"
+
+	"golang.org/x/crypto/ssh"
 )
+
+// Performance constants
+const (
+	// DefaultBufferSize is the buffer size for file transfers (256KB for optimal performance)
+	DefaultBufferSize = 256 * 1024
+
+	// LargeFileThreshold is the size above which we use larger buffers (10MB)
+	LargeFileThreshold = 10 * 1024 * 1024
+
+	// LargeBufferSize is used for files larger than LargeFileThreshold (1MB)
+	LargeBufferSize = 1024 * 1024
+)
+
+// GetOptimalBufferSize returns the optimal buffer size based on file size.
+func GetOptimalBufferSize(fileSize int64) int {
+	if fileSize > LargeFileThreshold {
+		return LargeBufferSize
+	}
+	return DefaultBufferSize
+}
+
+// CopyWithBuffer copies from src to dst using an optimized buffer size.
+func CopyWithBuffer(dst io.Writer, src io.Reader, fileSize int64) (int64, error) {
+	bufSize := GetOptimalBufferSize(fileSize)
+	buf := make([]byte, bufSize)
+	return io.CopyBuffer(dst, src, buf)
+}
 
 // FileInfo represents information about a remote file or directory.
 type FileInfo struct {
@@ -25,9 +55,12 @@ type TransferProgress struct {
 	StartTime      time.Time
 }
 
+// HostKeyCallback is a function called to verify SSH host keys.
+type HostKeyCallback func(hostname string, remote net.Addr, key ssh.PublicKey) error
+
 // ConnectionConfig holds the configuration for a connection.
 type ConnectionConfig struct {
-	Protocol   string // "sftp" or "ftps"
+	Protocol   string // "sftp", "ftps", or "ftp"
 	Host       string
 	Port       int
 	Username   string
@@ -36,8 +69,11 @@ type ConnectionConfig struct {
 	Timeout    time.Duration
 
 	// TLS settings for FTPS
-	TLSImplicit    bool // true for implicit FTPS (port 990)
-	TLSSkipVerify  bool // Skip certificate verification (not recommended)
+	TLSImplicit   bool // true for implicit FTPS (port 990)
+	TLSSkipVerify bool // Skip certificate verification (not recommended)
+
+	// SSH settings for SFTP
+	HostKeyCallback HostKeyCallback // Callback for host key verification
 }
 
 // Protocol defines the interface that both SFTP and FTPS clients must implement.

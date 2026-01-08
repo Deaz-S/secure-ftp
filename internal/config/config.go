@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -28,16 +29,21 @@ type ConnectionProfile struct {
 
 // AppConfig holds the application configuration.
 type AppConfig struct {
-	Profiles        []ConnectionProfile `json:"profiles"`
-	MaxParallelTransfers int            `json:"max_parallel_transfers"`
-	LogLevel        string              `json:"log_level"`
-	LogPath         string              `json:"log_path"`
-	Theme           string              `json:"theme"` // "light", "dark", "system"
-	WindowWidth     int                 `json:"window_width"`
-	WindowHeight    int                 `json:"window_height"`
-	ShowHiddenFiles bool                `json:"show_hidden_files"`
-	DefaultLocalDir string              `json:"default_local_dir"`
-	ResumeStatePath string              `json:"resume_state_path"`
+	Profiles             []ConnectionProfile `json:"profiles"`
+	MaxParallelTransfers int                 `json:"max_parallel_transfers"`
+	LogLevel             string              `json:"log_level"`
+	LogPath              string              `json:"log_path"`
+	Theme                string              `json:"theme"` // "light", "dark", "system"
+	WindowWidth          int                 `json:"window_width"`
+	WindowHeight         int                 `json:"window_height"`
+	ShowHiddenFiles      bool                `json:"show_hidden_files"`
+	DefaultLocalDir      string              `json:"default_local_dir"`
+	ResumeStatePath      string              `json:"resume_state_path"`
+	// Bandwidth limits (bytes per second, 0 = unlimited)
+	UploadRateLimit      int64               `json:"upload_rate_limit"`
+	DownloadRateLimit    int64               `json:"download_rate_limit"`
+	// Desktop notifications
+	EnableNotifications  bool                `json:"enable_notifications"`
 }
 
 // ConfigManager handles loading and saving configuration.
@@ -54,7 +60,7 @@ func DefaultConfig() *AppConfig {
 
 	return &AppConfig{
 		Profiles:             make([]ConnectionProfile, 0),
-		MaxParallelTransfers: 3,
+		MaxParallelTransfers: 4,
 		LogLevel:             "info",
 		LogPath:              filepath.Join(configDir, "logs", "secure-ftp.log"),
 		Theme:                "system",
@@ -63,6 +69,9 @@ func DefaultConfig() *AppConfig {
 		ShowHiddenFiles:      false,
 		DefaultLocalDir:      homeDir,
 		ResumeStatePath:      filepath.Join(configDir, "resume.json"),
+		UploadRateLimit:      0, // Unlimited by default
+		DownloadRateLimit:    0, // Unlimited by default
+		EnableNotifications:  true,
 	}
 }
 
@@ -119,7 +128,7 @@ func (cm *ConfigManager) Save() error {
 		return err
 	}
 
-	return os.WriteFile(cm.path, data, 0644)
+	return os.WriteFile(cm.path, data, 0600)
 }
 
 // Get returns a copy of the current configuration.
@@ -232,12 +241,12 @@ func (cm *ConfigManager) save() error {
 		return err
 	}
 
-	return os.WriteFile(cm.path, data, 0644)
+	return os.WriteFile(cm.path, data, 0600)
 }
 
 var profileCounter int
 
 func generateProfileID() string {
 	profileCounter++
-	return "profile-" + time.Now().Format("20060102150405") + "-" + string(rune('0'+profileCounter))
+	return "profile-" + time.Now().Format("20060102150405") + "-" + strconv.Itoa(profileCounter)
 }

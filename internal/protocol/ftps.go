@@ -353,8 +353,8 @@ func (c *FTPSClient) Download(ctx context.Context, remotePath, localPath string,
 	}
 	defer resp.Close()
 
-	// Copy data
-	if _, err := io.Copy(writer, resp); err != nil {
+	// Copy data with optimized buffer
+	if _, err := CopyWithBuffer(writer, resp, remoteSize); err != nil {
 		return fmt.Errorf("download failed: %w", err)
 	}
 

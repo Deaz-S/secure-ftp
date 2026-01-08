@@ -402,3 +402,72 @@ func (m *TransferManager) ClearHistory() {
 	defer m.mu.Unlock()
 	m.history = make([]*TransferItem, 0)
 }
+
+// Retry retries a failed transfer by re-adding it to the queue.
+func (m *TransferManager) Retry(id string) (*TransferItem, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Search in history for the failed transfer
+	for i, item := range m.history {
+		if item.ID == id && item.Status == StatusFailed {
+			// Remove from history
+			m.history = append(m.history[:i], m.history[i+1:]...)
+
+			// Create new transfer with same params
+			m.idCounter++
+			ctx, cancel := context.WithCancel(m.ctx)
+
+			newItem := &TransferItem{
+				ID:         fmt.Sprintf("transfer-%d", m.idCounter),
+				Direction:  item.Direction,
+				LocalPath:  item.LocalPath,
+				RemotePath: item.RemotePath,
+				Status:     StatusPending,
+				Priority:   item.Priority,
+				ctx:        ctx,
+				cancel:     cancel,
+			}
+
+			// Add to queue with priority
+			inserted := false
+			for j, existing := range m.queue {
+				if newItem.Priority > existing.Priority {
+					m.queue = append(m.queue[:j], append([]*TransferItem{newItem}, m.queue[j:]...)...)
+					inserted = true
+					break
+				}
+			}
+			if !inserted {
+				m.queue = append(m.queue, newItem)
+			}
+
+			// Start processing
+			go m.processQueue()
+
+			return newItem, nil
+		}
+	}
+
+	return nil, fmt.Errorf("failed transfer not found: %s", id)
+}
+
+// GetItem returns a transfer item by ID from queue or history.
+func (m *TransferManager) GetItem(id string) *TransferItem {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for _, item := range m.queue {
+		if item.ID == id {
+			return item
+		}
+	}
+
+	for _, item := range m.history {
+		if item.ID == id {
+			return item
+		}
+	}
+
+	return nil
+}

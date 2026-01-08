@@ -347,23 +347,76 @@ func (s *Syncer) needsSync(localInfo os.FileInfo, remoteInfo protocol.FileInfo) 
 		return diff > 2*time.Second
 
 	case CompareByHash:
-		// This is expensive, should be used carefully
-		return true // Would need actual hash comparison
+		// Quick check: different sizes means different content
+		if localInfo.Size() != remoteInfo.Size {
+			return true
+		}
+		// Same size: need full hash comparison (expensive)
+		// The actual hash comparison is done in needsSyncByHash
+		return true // Will be refined by needsSyncByHash when called with full paths
 
 	default:
 		return true
 	}
 }
 
+// needsSyncByHash compares files using MD5 hash.
+// Returns true if files are different, false if identical.
+func (s *Syncer) needsSyncByHash(ctx context.Context, localPath, remotePath string) (bool, error) {
+	// Compute local file hash
+	localHash, err := ComputeLocalChecksum(localPath)
+	if err != nil {
+		return true, fmt.Errorf("failed to compute local hash: %w", err)
+	}
+
+	// Download remote file to compute hash
+	// Create a temporary file to store remote content
+	tmpFile, err := os.CreateTemp("", "sftp-hash-*")
+	if err != nil {
+		return true, fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	tmpFile.Close()
+	defer os.Remove(tmpPath)
+
+	// Download remote file to temp
+	if err := s.client.Download(ctx, remotePath, tmpPath, false, nil); err != nil {
+		return true, fmt.Errorf("failed to download for hash comparison: %w", err)
+	}
+
+	// Compute remote file hash
+	remoteHash, err := ComputeLocalChecksum(tmpPath)
+	if err != nil {
+		return true, fmt.Errorf("failed to compute remote hash: %w", err)
+	}
+
+	// Compare hashes
+	return localHash != remoteHash, nil
+}
+
 func (s *Syncer) analyzeUpload(localDir, remoteDir string, localMap map[string]os.FileInfo, remoteMap map[string]protocol.FileInfo) []SyncAction {
 	var actions []SyncAction
+	ctx := context.Background()
 
 	for relPath, localInfo := range localMap {
 		localPath := filepath.Join(localDir, relPath)
 		remotePath := filepath.Join(remoteDir, relPath)
 
 		if remoteInfo, exists := remoteMap[relPath]; exists {
-			if s.needsSync(localInfo, remoteInfo) && localInfo.ModTime().After(remoteInfo.ModTime) {
+			needSync := s.needsSync(localInfo, remoteInfo)
+
+			// For hash comparison, do the actual hash check
+			if needSync && s.options.CompareMethod == CompareByHash {
+				different, err := s.needsSyncByHash(ctx, localPath, remotePath)
+				if err != nil {
+					// On error, assume sync needed
+					s.log.Warn("Hash comparison failed for %s: %v", localPath, err)
+				} else {
+					needSync = different
+				}
+			}
+
+			if needSync && localInfo.ModTime().After(remoteInfo.ModTime) {
 				actions = append(actions, SyncAction{
 					Type:       "upload",
 					LocalPath:  localPath,
@@ -393,13 +446,26 @@ func (s *Syncer) analyzeUpload(localDir, remoteDir string, localMap map[string]o
 
 func (s *Syncer) analyzeDownload(localDir, remoteDir string, localMap map[string]os.FileInfo, remoteMap map[string]protocol.FileInfo) []SyncAction {
 	var actions []SyncAction
+	ctx := context.Background()
 
 	for relPath, remoteInfo := range remoteMap {
 		localPath := filepath.Join(localDir, relPath)
 		remotePath := filepath.Join(remoteDir, relPath)
 
 		if localInfo, exists := localMap[relPath]; exists {
-			if s.needsSync(localInfo, remoteInfo) && remoteInfo.ModTime.After(localInfo.ModTime()) {
+			needSync := s.needsSync(localInfo, remoteInfo)
+
+			// For hash comparison, do the actual hash check
+			if needSync && s.options.CompareMethod == CompareByHash {
+				different, err := s.needsSyncByHash(ctx, localPath, remotePath)
+				if err != nil {
+					s.log.Warn("Hash comparison failed for %s: %v", localPath, err)
+				} else {
+					needSync = different
+				}
+			}
+
+			if needSync && remoteInfo.ModTime.After(localInfo.ModTime()) {
 				actions = append(actions, SyncAction{
 					Type:       "download",
 					LocalPath:  localPath,
@@ -449,6 +515,7 @@ func (s *Syncer) analyzeMirror(localDir, remoteDir string, localMap map[string]o
 
 func (s *Syncer) analyzeBidirectional(localDir, remoteDir string, localMap map[string]os.FileInfo, remoteMap map[string]protocol.FileInfo) []SyncAction {
 	var actions []SyncAction
+	ctx := context.Background()
 
 	// Process local files
 	for relPath, localInfo := range localMap {
@@ -456,7 +523,19 @@ func (s *Syncer) analyzeBidirectional(localDir, remoteDir string, localMap map[s
 		remotePath := filepath.Join(remoteDir, relPath)
 
 		if remoteInfo, exists := remoteMap[relPath]; exists {
-			if s.needsSync(localInfo, remoteInfo) {
+			needSync := s.needsSync(localInfo, remoteInfo)
+
+			// For hash comparison, do the actual hash check
+			if needSync && s.options.CompareMethod == CompareByHash {
+				different, err := s.needsSyncByHash(ctx, localPath, remotePath)
+				if err != nil {
+					s.log.Warn("Hash comparison failed for %s: %v", localPath, err)
+				} else {
+					needSync = different
+				}
+			}
+
+			if needSync {
 				if localInfo.ModTime().After(remoteInfo.ModTime) {
 					actions = append(actions, SyncAction{
 						Type:       "upload",

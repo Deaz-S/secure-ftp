@@ -4,6 +4,7 @@ package logger
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -256,8 +257,8 @@ func (l *Logger) Rotate(maxSize int64, maxBackups int) error {
 
 	// Rotate backups
 	for i := maxBackups - 1; i > 0; i-- {
-		oldPath := l.logPath + "." + string(rune('0'+i))
-		newPath := l.logPath + "." + string(rune('0'+i+1))
+		oldPath := l.logPath + "." + strconv.Itoa(i)
+		newPath := l.logPath + "." + strconv.Itoa(i+1)
 		os.Rename(oldPath, newPath)
 	}
 

@@ -60,11 +60,16 @@ func (c *SFTPClient) Connect(ctx context.Context, config *ConnectionConfig) erro
 		timeout = 30 * time.Second
 	}
 
-	// SSH client configuration
+	// SSH client configuration - Host key verification is REQUIRED for security
+	if config.HostKeyCallback == nil {
+		return fmt.Errorf("host key verification is required for SFTP connections - no HostKeyCallback provided")
+	}
+	hostKeyCallback := ssh.HostKeyCallback(config.HostKeyCallback)
+
 	sshConfig := &ssh.ClientConfig{
 		User:            config.Username,
 		Auth:            authMethods,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // TODO: Implement proper host key verification
+		HostKeyCallback: hostKeyCallback,
 		Timeout:         timeout,
 	}
 
@@ -87,8 +92,11 @@ func (c *SFTPClient) Connect(ctx context.Context, config *ConnectionConfig) erro
 
 	c.sshClient = ssh.NewClient(sshConn, chans, reqs)
 
-	// Create SFTP client
-	c.sftpClient, err = sftp.NewClient(c.sshClient)
+	// Create SFTP client with concurrent requests for better performance
+	c.sftpClient, err = sftp.NewClient(c.sshClient,
+		sftp.MaxConcurrentRequestsPerFile(64),  // Allow 64 concurrent requests per file
+		sftp.MaxPacket(32768),                   // 32KB packet size for optimal throughput
+	)
 	if err != nil {
 		c.sshClient.Close()
 		return fmt.Errorf("failed to create SFTP client: %w", err)
@@ -282,10 +290,10 @@ func (c *SFTPClient) Upload(ctx context.Context, localPath, remotePath string, r
 		ProgressFn: progressFn,
 	}
 
-	// Copy with context cancellation support
+	// Copy with context cancellation support and optimized buffer
 	done := make(chan error, 1)
 	go func() {
-		_, err := io.Copy(remoteFile, reader)
+		_, err := CopyWithBuffer(remoteFile, reader, totalSize)
 		done <- err
 	}()
 
@@ -373,10 +381,10 @@ func (c *SFTPClient) Download(ctx context.Context, remotePath, localPath string,
 		ProgressFn: progressFn,
 	}
 
-	// Copy with context cancellation support
+	// Copy with context cancellation support and optimized buffer
 	done := make(chan error, 1)
 	go func() {
-		_, err := io.Copy(writer, remoteFile)
+		_, err := CopyWithBuffer(writer, remoteFile, totalSize)
 		done <- err
 	}()
 

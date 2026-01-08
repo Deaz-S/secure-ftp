@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Background circle -->
+  <circle cx="32" cy="32" r="30" fill="#2196F3"/>
+
+  <!-- Folder base -->
+  <path d="M12 20h16l4 4h20a2 2 0 012 2v20a2 2 0 01-2 2H12a2 2 0 01-2-2V22a2 2 0 012-2z" fill="#FFC107"/>
+  <path d="M12 20h16l4 4h20a2 2 0 012 2v2H10v-6a2 2 0 012-2z" fill="#FFD54F"/>
+
+  <!-- Lock -->
+  <rect x="26" y="32" width="12" height="10" rx="2" fill="#4CAF50"/>
+  <path d="M28 32v-3a4 4 0 018 0v3" fill="none" stroke="#4CAF50" stroke-width="2"/>
+  <circle cx="32" cy="37" r="1.5" fill="#fff"/>
+
+  <!-- Transfer arrows -->
+  <path d="M8 38l-4-4 4-4" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M56 38l4-4-4-4" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="4" y1="34" x2="14" y2="34" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+  <line x1="50" y1="34" x2="60" y2="34" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+</svg>
