@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strconv"
 
 	"fyne.io/fyne/v2"
@@ -118,10 +119,12 @@ func (cd *ConnectionDialog) buildForm() {
 	cd.profileSelect = widget.NewSelect(profileNames, cd.onProfileSelected)
 
 	cd.deleteProfileBtn = widget.NewButtonWithIcon("", theme.DeleteIcon(), func() {
+		fmt.Println("DEBUG: Delete button clicked, selectedProfileID =", cd.selectedProfileID)
 		cd.deleteSelectedProfile()
 	})
 	cd.deleteProfileBtn.Importance = widget.DangerImportance
 	cd.deleteProfileBtn.Disable()
+	fmt.Println("DEBUG: Delete button created")
 
 	cd.protocolSelect.SetSelectedIndex(0)
 	cd.profileSelect.SetSelectedIndex(0)
@@ -170,24 +173,29 @@ func (cd *ConnectionDialog) buildForm() {
 }
 
 func (cd *ConnectionDialog) onProfileSelected(selected string) {
+	fmt.Println("DEBUG: onProfileSelected called with:", selected)
 	if selected == "-- Nouvelle connexion --" {
 		cd.clearForm()
 		cd.selectedProfileID = ""
 		cd.deleteProfileBtn.Disable()
+		fmt.Println("DEBUG: Nouvelle connexion selected, button disabled")
 		return
 	}
 
 	profiles := cd.configMgr.GetProfiles()
+	fmt.Printf("DEBUG: Found %d profiles\n", len(profiles))
 	for _, p := range profiles {
 		if p.Name == selected {
 			cd.loadProfile(&p)
 			cd.deleteProfileBtn.Enable()
+			fmt.Println("DEBUG: Profile loaded, delete button enabled")
 			return
 		}
 	}
 }
 
 func (cd *ConnectionDialog) loadProfile(profile *config.ConnectionProfile) {
+	fmt.Printf("DEBUG: loadProfile called, profile.ID=%s, profile.Name=%s\n", profile.ID, profile.Name)
 	cd.selectedProfileID = profile.ID
 
 	switch profile.Protocol {
@@ -345,9 +353,12 @@ func (e *connectionError) Error() string {
 }
 
 func (cd *ConnectionDialog) deleteSelectedProfile() {
+	fmt.Println("DEBUG: deleteSelectedProfile called, selectedProfileID =", cd.selectedProfileID)
 	if cd.selectedProfileID == "" {
+		fmt.Println("DEBUG: selectedProfileID is empty, returning")
 		return
 	}
+	fmt.Println("DEBUG: Proceeding with deletion")
 
 	if cd.credentialsMgr != nil {
 		cd.credentialsMgr.DeletePassword(cd.selectedProfileID)
