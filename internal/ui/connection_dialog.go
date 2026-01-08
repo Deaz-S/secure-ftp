@@ -126,10 +126,10 @@ func (cd *ConnectionDialog) buildForm() {
 	}
 	cd.profileSelect = widget.NewSelect(profileNames, cd.onProfileSelected)
 
-	// Delete profile button (hidden by default)
+	// Delete profile button (disabled by default)
 	cd.deleteProfileBtn = widget.NewButtonWithIcon("", theme.DeleteIcon(), cd.deleteSelectedProfile)
 	cd.deleteProfileBtn.Importance = widget.DangerImportance
-	cd.deleteProfileBtn.Hide()
+	cd.deleteProfileBtn.Disable()
 
 	// Initial selections
 	cd.protocolSelect.SetSelectedIndex(0)
@@ -185,21 +185,19 @@ func (cd *ConnectionDialog) buildForm() {
 	dlg.Show()
 }
 
-// onProfileSelected handles profile selection.
 func (cd *ConnectionDialog) onProfileSelected(selected string) {
 	if selected == "-- Nouvelle connexion --" {
 		cd.clearForm()
 		cd.selectedProfileID = ""
-		cd.deleteProfileBtn.Hide()
+		cd.deleteProfileBtn.Disable()
 		return
 	}
 
-	// Find and load profile
 	profiles := cd.configMgr.GetProfiles()
 	for _, p := range profiles {
 		if p.Name == selected {
 			cd.loadProfile(&p)
-			cd.deleteProfileBtn.Show()
+			cd.deleteProfileBtn.Enable()
 			return
 		}
 	}
@@ -405,7 +403,7 @@ func (cd *ConnectionDialog) deleteSelectedProfile() {
 			cd.refreshProfileList()
 			cd.clearForm()
 			cd.profileSelect.SetSelectedIndex(0)
-			cd.deleteProfileBtn.Hide()
+			cd.deleteProfileBtn.Disable()
 		}, cd.window)
 }
 
